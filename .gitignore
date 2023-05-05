@@ -1,0 +1,6 @@
+secrets.env
+secrets.json
+
+/data/*/*
+!/data/*/.gitkeep
+!/data/traefik/services

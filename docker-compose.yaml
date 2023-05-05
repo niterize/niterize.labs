@@ -1,0 +1,86 @@
+version: '3.3'
+services:
+  portainer:
+    ports:
+      - '0.0.0.0:9000:9000'
+    container_name: portainer
+    restart: unless-stopped
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock'
+      - '$PWD/data/portainer:/data'
+    image: portainer/portainer:latest
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.portainer.entrypoints=web"
+      - "traefik.http.routers.portainer.rule=Host(`portainer.$MY_DOMAIN`)"
+
+  redis:
+    volumes:
+      - '$PWD/data/redis/redis-stack.conf:/redis-stack.conf'
+    restart: unless-stopped
+    ports:
+      - '0.0.0.0:6379:6379'
+      - '0.0.0.0:8001:8001'
+    image: 'redis/redis-stack:latest'
+    container_name: redis
+
+  postgresql:
+    ports:
+      - '0.0.0.0:5432:5432'
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - '$PWD/data/postgresql:/var/lib/postgresql/data'
+    image: postgres
+
+  traefik:
+    command: --api.insecure=true --providers.docker
+    ports:
+      - "0.0.0.0:80:80"
+      - "0.0.0.0:8080:8080"
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - '$PWD/traefik.yml:/etc/traefik/traefik.yml'
+      - '$PWD/data/traefik/services:/etc/traefik/services'
+    image: traefik:v2.10
+
+  rabbitmq:
+    ports:
+      - '0.0.0.0:15672:15672'
+      - '0.0.0.0:5672:5672'
+      - '0.0.0.0:25676:25676'
+    environment:
+      - "RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS}"
+      - "RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}"
+      - "RABBITMQ_DEFAULT_VHOST='vhost'"
+    restart: unless-stopped
+    volumes:
+      - "$PWD/data/rabbitmq:/var/lib/rabbitmq"
+    image: 'rabbitmq:3-management'
+
+  ravendb:
+    ports:
+      - '8096:8080'
+      - '38888:38888'
+      - '8443:8443'
+    volumes:
+      - '$PWD/data/ravendb:/opt/RavenDB/Server/RavenData'
+    container_name: ravendb
+    environment:
+      - RAVEN_Setup_Mode=None
+      - RAVEN_License_Eula_Accepted=true
+      - RAVEN_Security_UnsecuredAccessAllowed=PrivateNetwork
+    image: ravendb/ravendb
+
+  whoami:
+    image: traefik/whoami
+    labels:
+      - "traefik.http.routers.whoami.rule=Host(`whoami.docker.localhost`)"
+
+networks:
+  traefik-net:
+    driver: overlay
+    external: true

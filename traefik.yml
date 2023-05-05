@@ -1,0 +1,37 @@
+providers:
+  file:
+    directory: /etc/traefik/services/
+    watch: true
+
+entryPoints:
+  web:
+    address: "0.0.0.0:80"
+  wesecure:
+    address: "0.0.0.0:443"
+    
+api:
+  insecure: true
+  dashboard: true
+  debug: true
+
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: admin@proxfield.com
+      storage: acme.json
+      keyType: EC384
+      httpChallenge:
+        entryPoint: web
+
+  buypass:
+    acme:
+      email: admin@proxfield.com
+      storage: acme.json
+      caServer: https://api.buypass.com/acme/directory
+      keyType: EC256
+      httpChallenge:
+        entryPoint: web
+
+log:
+  level: DEBUG
+  # format: json
