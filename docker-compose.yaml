@@ -24,16 +24,18 @@ services:
     image: 'redis/redis-stack:latest'
     container_name: redis
 
-  postgresql:
-    ports:
-      - '0.0.0.0:5432:5432'
-    restart: unless-stopped
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+  mssql:
     volumes:
-      - '$PWD/data/postgresql:/var/lib/postgresql/data'
-    image: postgres
+      - '$PWD/data/sqlserver/:/var/opt/mssql'
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=${MSSQL_PASS}
+    ports:
+      - '1433:1433'
+    container_name: mssql
+    restart: unless-stopped
+    hostname: sql1
+    image: 'mcr.microsoft.com/mssql/server:2022-latest'
 
   traefik:
     command: --api.insecure=true --providers.docker
@@ -41,6 +43,19 @@ services:
       - "0.0.0.0:80:80"
       - "0.0.0.0:8080:8080"
     restart: unless-stopped
+    deploy:
+      labels:
+        traefik.docker.network: "traefik-net"
+        traefik.enable: "true"
+        traefik.http.routers.traefik.entrypoints: "http"
+        traefik.http.routers.traefik.middlewares: "traefikAuth@file,default@file"
+        traefik.http.routers.traefik.service: "api@internal"
+        traefik.http.routers.traefik.tls.options: "modern@file"
+        traefik.http.routers.traefik.tls: "false"
+        traefik.http.services.traefik.loadbalancer.server.port: 8080
+        traefik.http.services.traefik.loadbalancer.sticky.cookie.httpOnly: "true"
+        traefik.http.services.traefik.loadbalancer.sticky.cookie.secure: "false"
+      mode: global
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - '$PWD/traefik.yml:/etc/traefik/traefik.yml'
@@ -79,6 +94,21 @@ services:
     image: traefik/whoami
     labels:
       - "traefik.http.routers.whoami.rule=Host(`whoami.docker.localhost`)"
+
+
+  otel-collector:
+    image: otel/opentelemetry-collector
+    command: [--config=/etc/otel-collector-config.yaml]
+    volumes:
+      - '$PWD/otel-collector-config.yaml:/etc/otel-collector-config.yaml'
+    ports:
+      - 1888:1888 # pprof extension
+      - 8888:8888 # Prometheus metrics exposed by the collector
+      - 8889:8889 # Prometheus exporter metrics
+      - 13133:13133 # health_check extension
+      - 4317:4317 # OTLP gRPC receiver
+      - 4318:4318 # OTLP http receiver
+      - 55679:55679 # zpages extension
 
 networks:
   traefik-net:
